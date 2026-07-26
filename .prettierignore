@@ -1,0 +1,6 @@
+.next
+node_modules
+package-lock.json
+
+# Project docs — not this repo's to reformat
+*.md
