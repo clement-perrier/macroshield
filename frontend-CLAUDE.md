@@ -1,6 +1,8 @@
 # MacroShield — Frontend
 
 This file is project memory for Claude Code. Read it before writing code in this repo.
+Never push any thing to the github repo with Claude trailer. 
+First time I use NextJS, don't hesitate to expalin code related to NextJS and suggests improvement related to NextJS.
 
 ## What this app does
 
@@ -24,6 +26,7 @@ This repo is the **frontend** (Next.js/React web app). The **backend is a separa
   - A charting library for the metric cards/sparklines — `recharts` is a reasonable default; swap for `visx`/`lightweight-charts` if we need candlestick-style technical charts later.
   - `shadcn/ui` or Radix primitives for the accordion (Studio tab) and other interactive components.
   - Local UI state via `useState`; only reach for a state library (Zustand etc.) if cross-page state actually needs it.
+- Keep in mind we have to setup a CI/CD pipeline to streamline the updates and deployements processes (backend and frontend), bring this subjects when you think it's time to set it up. Beside I would like to use a tool such as Github Actions if possible, to be discussed.
 
 ## App structure — 3 tabs
 
