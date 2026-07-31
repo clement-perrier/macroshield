@@ -1,6 +1,8 @@
 # MacroShield — Backend
 
 This file is project memory for Claude Code. Read it before writing code in this repo.
+Never push any thing to the github repo with Claude trailer. 
+Keep in mind Pythin is not my speciality, don't hesitate to explain lines of code.
 
 ## What this app does
 
@@ -31,6 +33,7 @@ This repo is the **backend**: data ingestion, the rules engine, the ML layer, an
   - APScheduler (simple) or Celery + Redis (if we need distributed/retryable jobs) for the periodic FRED pulls and the 6-hourly news scan.
   - `pydantic` v2 for schemas, `alembic` for migrations, `pytest` for tests, `ruff` + `black` for lint/format, `uv` or `poetry` for dependency management.
 - Treat all of the above as defaults to confirm with me, not settled decisions — say so explicitly if you change one.
+- Keep in mind we have to setup a CI/CD pipeline to streamline the updates and deployement processes (backend and frontend), bring this subjects when you think it's time to set it up. Beside I would like to use a tool such as Github Actions if possible, to be discussed.
 
 ## Zones & indicators — canonical data sources
 
