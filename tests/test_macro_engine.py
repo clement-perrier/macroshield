@@ -7,7 +7,10 @@ from app.services.macro_engine import (
     InsufficientDataError,
     Phase,
     classify_phase,
+    classify_rate_trend,
     classify_yield_curve,
+    compute_yield_curve_observations,
+    momentum_zscore,
     zscore,
 )
 
@@ -116,3 +119,71 @@ def test_classify_phase_deep_in_quadrant_is_not_a_transition() -> None:
 def test_classify_phase_raises_insufficient_data_for_missing_scores() -> None:
     with pytest.raises(InsufficientDataError):
         classify_phase(None, 1.0, yield_curve_state="normal")
+
+
+def test_classify_phase_handles_no_yield_curve_proxy() -> None:
+    # China has no yield curve proxy at all (backend-CLAUDE.md flags no clean FRED
+    # equivalent) — yield_curve_state=None should classify normally, override never fires.
+    result = classify_phase(growth_score=-1.0, inflation_score=-1.0, yield_curve_state=None)
+    assert result.phase == Phase.RECESSION
+    assert result.recession_override is False
+
+
+def test_compute_yield_curve_observations_passthrough_when_no_short_series() -> None:
+    long_obs = _make_observations([0.4, 0.5], start=date(2026, 1, 1), step_days=30)
+    assert compute_yield_curve_observations(long_obs) == long_obs
+
+
+def test_compute_yield_curve_observations_computes_spread() -> None:
+    long_obs = [
+        FredObservation(date=date(2026, 1, 1), value=3.0),
+        FredObservation(date=date(2026, 2, 1), value=3.2),
+    ]
+    short_obs = [
+        FredObservation(date=date(2026, 1, 1), value=2.5),
+        FredObservation(date=date(2026, 2, 1), value=3.5),
+    ]
+    spread = compute_yield_curve_observations(long_obs, short_obs)
+    assert [o.value for o in spread] == pytest.approx([0.5, -0.3])
+
+
+def test_compute_yield_curve_observations_skips_unmatched_dates() -> None:
+    long_obs = [
+        FredObservation(date=date(2026, 1, 1), value=3.0),
+        FredObservation(date=date(2026, 2, 1), value=3.2),
+    ]
+    short_obs = [FredObservation(date=date(2026, 1, 1), value=2.5)]  # missing Feb
+    spread = compute_yield_curve_observations(long_obs, short_obs)
+    assert len(spread) == 1
+    assert spread[0].date == date(2026, 1, 1)
+
+
+def test_classify_rate_trend_rising() -> None:
+    # 4 monthly points spanning 90 days, so a reference ~3 months back exists.
+    observations = _make_observations([1.0, 1.1, 1.25, 1.5], start=date(2026, 1, 1), step_days=30)
+    assert classify_rate_trend(observations) == "rising"
+
+
+def test_classify_rate_trend_falling() -> None:
+    observations = _make_observations([1.5, 1.25, 1.1, 1.0], start=date(2026, 1, 1), step_days=30)
+    assert classify_rate_trend(observations) == "falling_fast"
+
+
+def test_classify_rate_trend_works_on_daily_frequency_series() -> None:
+    # EU's rate series (ECBMRRFR) is daily, unlike US/China's monthly ones — the
+    # lookback must be date-based, not a fixed index offset, to handle this.
+    # 91 daily points spanning exactly 90 days, so a reference 90 days back exists.
+    observations = _make_observations([2.0] * 90 + [2.5], start=date(2026, 1, 1), step_days=1)
+    assert classify_rate_trend(observations) == "rising"
+
+
+def test_classify_rate_trend_raises_without_enough_history() -> None:
+    observations = _make_observations([1.0, 1.1], start=date(2026, 1, 1), step_days=1)
+    with pytest.raises(InsufficientDataError):
+        classify_rate_trend(observations)
+
+
+def test_momentum_zscore_raises_without_enough_history() -> None:
+    observations = _make_observations([100.0] * 10, start=date(2020, 1, 1), step_days=30)
+    with pytest.raises(InsufficientDataError):
+        momentum_zscore(observations)

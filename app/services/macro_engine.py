@@ -17,8 +17,12 @@ TRAILING_HISTORY_MONTHS = 5 * 12
 """5-year trailing window, per backend-CLAUDE.md's Z-score normalization section."""
 
 YIELD_CURVE_LOOKBACK_DAYS = 730
-"""~24 months. A positive T10Y2Y today still counts as "normalizing_post_inversion"
+"""~24 months. A positive spread today still counts as "normalizing_post_inversion"
 (not "normal") if the curve was inverted at any point in this window."""
+
+RATE_TREND_LOOKBACK_DAYS = 90
+"""~3 months, per backend-CLAUDE.md. Date-based (not a fixed index offset) so it
+works whether the underlying rate series is monthly (US, China) or daily (EU)."""
 
 
 class Phase(StrEnum):
@@ -64,7 +68,14 @@ def _momentum_series(observations: list[FredObservation], window: int) -> list[f
     return momentum
 
 
-def _zscore_latest_momentum(observations: list[FredObservation]) -> float:
+def momentum_zscore(observations: list[FredObservation]) -> float:
+    """Z-score of a series' 3-month annualized % change against its own trailing
+    5-year history. Momentum, not level — a raw level (e.g. an industrial
+    production index, or CPI's ~monotonically increasing level) doesn't swing
+    enough around its own trailing mean to be a useful cycle signal on its own.
+    Used for both the growth axis (PMI-proxy series) and the inflation axis (CPI
+    series) across all zones — same computation, different input series.
+    """
     momentum = _momentum_series(observations, MOMENTUM_WINDOW_MONTHS)
     required = TRAILING_HISTORY_MONTHS + 1
     if len(momentum) < required:
@@ -76,35 +87,52 @@ def _zscore_latest_momentum(observations: list[FredObservation]) -> float:
     return zscore(current, history)
 
 
-def growth_score_from_ipman(observations: list[FredObservation]) -> float:
-    """Z-score of IPMAN's 3-month annualized % change against its own trailing 5-year
-    history. Momentum, not level — the raw IPMAN level doesn't swing enough around
-    its own trailing mean to be a useful cycle signal (see backend-CLAUDE.md notes)."""
-    return _zscore_latest_momentum(observations)
-
-
-def inflation_score_from_cpi(observations: list[FredObservation]) -> float:
-    """Z-score of CPI's 3-month annualized % change against its own trailing 5-year
-    history. Momentum, not level — CPI's raw level is ~monotonically increasing, so
-    Z-scoring the level directly would be meaningless."""
-    return _zscore_latest_momentum(observations)
-
-
 def classify_rate_trend(observations: list[FredObservation]) -> RateTrend:
-    """Compare the latest central bank rate to 3 months ago, per backend-CLAUDE.md.
+    """Compare the latest central bank rate to ~3 months ago, per backend-CLAUDE.md.
     Simplification: only distinguishes rising/falling_fast/low_stable — the docs
     note that "high plateau" vs "low plateau" isn't automatable from the rate alone.
     Not fed into classify_phase — kept as a tie-breaker/confidence input for later.
     """
-    latest, three_months_ago = observations[-1], observations[-4]
-    if latest.value is None or three_months_ago.value is None:
+    latest = observations[-1]
+    if latest.value is None:
         raise ValueError("Cannot classify rate trend from a missing observation")
 
-    if latest.value > three_months_ago.value:
+    cutoff = latest.date - timedelta(days=RATE_TREND_LOOKBACK_DAYS)
+    reference = next(
+        (o for o in reversed(observations[:-1]) if o.date <= cutoff and o.value is not None),
+        None,
+    )
+    if reference is None:
+        raise InsufficientDataError("Not enough history to compare rate trend over ~3 months")
+
+    if latest.value > reference.value:
         return "rising"
-    if latest.value < three_months_ago.value:
+    if latest.value < reference.value:
         return "falling_fast"
     return "low_stable"
+
+
+def compute_yield_curve_observations(
+    long_obs: list[FredObservation],
+    short_obs: list[FredObservation] | None = None,
+) -> list[FredObservation]:
+    """Build the observation series to feed classify_yield_curve.
+
+    If short_obs is None, long_obs already IS the spread (e.g. US's T10Y2Y,
+    precomputed by FRED). Otherwise, computes long - short per matching date
+    (e.g. EU: DE 10Y minus 3-month interbank), skipping dates missing on either
+    side.
+    """
+    if short_obs is None:
+        return long_obs
+
+    short_by_date = {o.date: o.value for o in short_obs if o.value is not None}
+    spread = []
+    for o in long_obs:
+        if o.value is None or o.date not in short_by_date:
+            continue
+        spread.append(FredObservation(date=o.date, value=o.value - short_by_date[o.date]))
+    return spread
 
 
 def classify_yield_curve(observations: list[FredObservation]) -> YieldCurveState:
@@ -129,13 +157,17 @@ def classify_yield_curve(observations: list[FredObservation]) -> YieldCurveState
 def classify_phase(
     growth_score: float,
     inflation_score: float,
-    yield_curve_state: YieldCurveState,
+    yield_curve_state: YieldCurveState | None,
     transition_threshold: float = 0.6,
 ) -> PhaseResult:
     """Classify the economic cycle phase from two continuous momentum Z-scores
     (the growth/inflation quadrant framework). Exhaustive by construction: every
     (growth_score, inflation_score) pair falls into exactly one of 4 quadrants,
     unlike the earlier 4-row categorical matrix this replaces.
+
+    yield_curve_state may be None for zones with no yield curve proxy (e.g.
+    China) — the recession override simply never applies in that case, and
+    classification falls through to the quadrant as normal.
     """
     if growth_score is None or inflation_score is None:
         raise InsufficientDataError("growth_score or inflation_score missing")

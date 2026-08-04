@@ -1,42 +1,93 @@
+from datetime import date, timedelta
+
 from fastapi import APIRouter, HTTPException
 
-from app.services.fred_client import (
-    CPIAUCSL_SERIES_ID,
-    FEDFUNDS_SERIES_ID,
-    IPMAN_SERIES_ID,
-    T10Y2Y_SERIES_ID,
-    fetch_series,
-)
+from app.core.zones import ZONE_CONFIGS
+from app.services.fred_client import fetch_series
 from app.services.macro_engine import (
+    MOMENTUM_WINDOW_MONTHS,
+    TRAILING_HISTORY_MONTHS,
     InsufficientDataError,
     classify_phase,
     classify_rate_trend,
     classify_yield_curve,
-    growth_score_from_ipman,
-    inflation_score_from_cpi,
+    compute_yield_curve_observations,
+    momentum_zscore,
 )
 
 router = APIRouter(prefix="/zones", tags=["macro"])
 
+BUFFER_MONTHS = 6
+FETCH_LOOKBACK_DAYS = 30 * (TRAILING_HISTORY_MONTHS + MOMENTUM_WINDOW_MONTHS + BUFFER_MONTHS)
+"""How far back to ask FRED for data. Derived from macro_engine's own momentum_zscore
+requirement (its largest lookback) plus a buffer, rather than a standalone guess —
+so it can't silently drift out of sync if that requirement changes later."""
+
 
 @router.get("/{zone}/macro")
 async def get_zone_macro(zone: str) -> dict:
-    if zone != "us":
+    zone_config = ZONE_CONFIGS.get(zone)
+    if zone_config is None:
         raise HTTPException(status_code=404, detail=f"Zone '{zone}' is not supported yet")
 
-    pmi_obs = await fetch_series(IPMAN_SERIES_ID)
-    inflation_obs = await fetch_series(CPIAUCSL_SERIES_ID)
-    rate_obs = await fetch_series(FEDFUNDS_SERIES_ID)
-    curve_obs = await fetch_series(T10Y2Y_SERIES_ID)
+    observation_start = date.today() - timedelta(days=FETCH_LOOKBACK_DAYS)
+
+    pmi_obs = await fetch_series(zone_config.pmi_series_id, observation_start)
+    inflation_obs = await fetch_series(zone_config.inflation_series_id, observation_start)
+    rate_obs = await fetch_series(zone_config.rate_series_id, observation_start)
 
     try:
-        growth_score = growth_score_from_ipman(pmi_obs)
-        inflation_score = inflation_score_from_cpi(inflation_obs)
+        growth_score = momentum_zscore(pmi_obs)
+        inflation_score = momentum_zscore(inflation_obs)
     except InsufficientDataError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
-    yield_curve_state = classify_yield_curve(curve_obs)
     rate_trend = classify_rate_trend(rate_obs)
+
+    metrics = [
+        {
+            "series_id": zone_config.pmi_series_id,
+            "label": "PMI proxy growth momentum",
+            "date": pmi_obs[-1].date,
+            "value": pmi_obs[-1].value,
+            "growth_score": round(growth_score, 3),
+        },
+        {
+            "series_id": zone_config.inflation_series_id,
+            "label": "Inflation momentum",
+            "date": inflation_obs[-1].date,
+            "value": inflation_obs[-1].value,
+            "inflation_score": round(inflation_score, 3),
+        },
+        {
+            "series_id": zone_config.rate_series_id,
+            "label": "Central bank rate",
+            "date": rate_obs[-1].date,
+            "value": rate_obs[-1].value,
+            "trend": rate_trend,
+        },
+    ]
+
+    yield_curve_state = None
+    if zone_config.yield_curve_long_series_id is not None:
+        long_obs = await fetch_series(zone_config.yield_curve_long_series_id, observation_start)
+        short_obs = None
+        if zone_config.yield_curve_short_series_id is not None:
+            short_obs = await fetch_series(
+                zone_config.yield_curve_short_series_id, observation_start
+            )
+
+        curve_obs = compute_yield_curve_observations(long_obs, short_obs)
+        yield_curve_state = classify_yield_curve(curve_obs)
+        metrics.append(
+            {
+                "series_id": zone_config.yield_curve_long_series_id,
+                "label": "Yield curve",
+                "date": curve_obs[-1].date,
+                "value": curve_obs[-1].value,
+                "trend": yield_curve_state,
+            }
+        )
 
     result = classify_phase(growth_score, inflation_score, yield_curve_state)
 
@@ -45,34 +96,5 @@ async def get_zone_macro(zone: str) -> dict:
         "confidence": round(result.confidence, 3),
         "is_transition": result.is_transition,
         "recession_override": result.recession_override,
-        "metrics": [
-            {
-                "series_id": IPMAN_SERIES_ID,
-                "label": "PMI proxy (IPMAN) growth momentum",
-                "date": pmi_obs[-1].date,
-                "value": pmi_obs[-1].value,
-                "growth_score": round(growth_score, 3),
-            },
-            {
-                "series_id": CPIAUCSL_SERIES_ID,
-                "label": "Inflation (CPI) momentum",
-                "date": inflation_obs[-1].date,
-                "value": inflation_obs[-1].value,
-                "inflation_score": round(inflation_score, 3),
-            },
-            {
-                "series_id": FEDFUNDS_SERIES_ID,
-                "label": "Central bank rate (Fed Funds)",
-                "date": rate_obs[-1].date,
-                "value": rate_obs[-1].value,
-                "trend": rate_trend,
-            },
-            {
-                "series_id": T10Y2Y_SERIES_ID,
-                "label": "Yield curve (10Y-2Y)",
-                "date": curve_obs[-1].date,
-                "value": curve_obs[-1].value,
-                "trend": yield_curve_state,
-            },
-        ],
+        "metrics": metrics,
     }
