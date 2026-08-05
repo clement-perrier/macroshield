@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import StrEnum
@@ -5,6 +6,8 @@ from statistics import mean, stdev
 from typing import Literal
 
 from app.services.fred_client import FredObservation
+
+logger = logging.getLogger(__name__)
 
 RateTrend = Literal["low_stable", "rising", "high", "falling_fast"]
 YieldCurveState = Literal["normal", "inverted", "normalizing_post_inversion"]
@@ -23,6 +26,11 @@ YIELD_CURVE_LOOKBACK_DAYS = 730
 RATE_TREND_LOOKBACK_DAYS = 90
 """~3 months, per backend-CLAUDE.md. Date-based (not a fixed index offset) so it
 works whether the underlying rate series is monthly (US, China) or daily (EU)."""
+
+RATE_TREND_TOLERANCE = 0.1
+"""Minimum absolute change (percentage points) to count as a real move rather
+than noise/rounding — central bank rates move in discrete ~25bp+ policy steps,
+so anything smaller isn't a meaningful trend signal."""
 
 
 class Phase(StrEnum):
@@ -92,6 +100,7 @@ def classify_rate_trend(observations: list[FredObservation]) -> RateTrend:
     Simplification: only distinguishes rising/falling_fast/low_stable — the docs
     note that "high plateau" vs "low plateau" isn't automatable from the rate alone.
     Not fed into classify_phase — kept as a tie-breaker/confidence input for later.
+    Moves within RATE_TREND_TOLERANCE count as low_stable, not noise misread as a trend.
     """
     latest = observations[-1]
     if latest.value is None:
@@ -105,9 +114,10 @@ def classify_rate_trend(observations: list[FredObservation]) -> RateTrend:
     if reference is None:
         raise InsufficientDataError("Not enough history to compare rate trend over ~3 months")
 
-    if latest.value > reference.value:
+    diff = latest.value - reference.value
+    if diff > RATE_TREND_TOLERANCE:
         return "rising"
-    if latest.value < reference.value:
+    if diff < -RATE_TREND_TOLERANCE:
         return "falling_fast"
     return "low_stable"
 
@@ -193,6 +203,7 @@ def classify_phase(
 
     # Magnitude: raw distance from the origin, in combined Z-score units.
     magnitude = (growth_score**2 + inflation_score**2) ** 0.5
+    logger.info(magnitude)
     # Confidence: how strongly to trust this phase call, scaled/capped to 0-1 for display.
     confidence = min(1.0, magnitude / 2.0)
 

@@ -177,6 +177,30 @@ def test_classify_rate_trend_works_on_daily_frequency_series() -> None:
     assert classify_rate_trend(observations) == "rising"
 
 
+def test_classify_rate_trend_small_move_within_tolerance_is_stable() -> None:
+    # 1bp drift over 3 months — noise/rounding, not a real policy move.
+    observations = _make_observations(
+        [2.15, 2.15, 2.15, 2.16], start=date(2026, 1, 1), step_days=30
+    )
+    assert classify_rate_trend(observations) == "low_stable"
+
+
+def test_classify_rate_trend_move_at_tolerance_boundary_is_stable() -> None:
+    # diff exactly equals RATE_TREND_TOLERANCE (0.1) — boundary is exclusive.
+    # 0.0 -> 0.1 keeps the float subtraction exact (2.15 -> 2.25 lands on
+    # 0.10000000000000009 due to float rounding, which would flip this test).
+    observations = _make_observations([0.0, 0.0, 0.0, 0.1], start=date(2026, 1, 1), step_days=30)
+    assert classify_rate_trend(observations) == "low_stable"
+
+
+def test_classify_rate_trend_move_above_tolerance_is_rising() -> None:
+    # Real EU ECBMRRFR example: 2.15 -> 2.4, a genuine +25bp hike.
+    observations = _make_observations(
+        [2.15, 2.15, 2.15, 2.4], start=date(2026, 1, 1), step_days=30
+    )
+    assert classify_rate_trend(observations) == "rising"
+
+
 def test_classify_rate_trend_raises_without_enough_history() -> None:
     observations = _make_observations([1.0, 1.1], start=date(2026, 1, 1), step_days=1)
     with pytest.raises(InsufficientDataError):
