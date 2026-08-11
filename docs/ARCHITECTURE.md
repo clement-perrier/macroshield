@@ -12,9 +12,10 @@
                                                     │
                                                     ▼
                                              ┌──────────────┐
-                                             │   Database   │
-                                             │  (TBD — see  │
-                                             │  open Qs)    │
+                                             │  PostgreSQL  │
+                                             │  self-hosted │
+                                             │  on the free │
+                                             │  Oracle VM   │
                                              └──────────────┘
 ```
 
@@ -25,11 +26,14 @@
   access (FRED API only — never scraped, per FRED's terms of use), the
   macro/sector/fundamental/technical rules engine, and (later) the ML
   breakout model. Exposes the public API contract the frontend consumes.
-- **Database** — not yet chosen/provisioned. `backend/CLAUDE.md` assumes
-  Postgres (+ TimescaleDB for the time-series indicator history); your
-  global stack notes say MySQL HeatWave on Oracle Cloud. Needs a decision
-  before the persistence layer (indicator history, user strategy configs,
-  auth) is built.
+- **Database** — PostgreSQL, self-hosted on the Oracle Cloud Always Free VM
+  (`oracle-vm`) — decided 2026-08-10. Oracle has no free *managed* Postgres
+  offering: their paid "OCI Database with PostgreSQL" service is billed per
+  OCPU/storage, and the free Autonomous Database is a different, non-Postgres
+  engine. Running it ourselves on the free compute/storage allocation is the
+  only $0 way to get real Postgres, at the cost of owning patching, backups,
+  and tuning ourselves. TimescaleDB extension still to evaluate for the
+  time-series indicator history.
 
 ## API contract
 
@@ -51,6 +55,10 @@ set up:
 - Backend: presumably a systemd service on the Oracle VM (matching the
   existing pattern used for the other app), reachable from the frontend
   over the VM's subnet or a public endpoint.
+- Database: PostgreSQL installed directly on the same free VM (or a second
+  Always Free VM for isolation from the unrelated `conjugationapp`
+  workload — Always Free includes 2 AMD VMs plus up to 4 Arm OCPUs to split
+  across instances). Not yet installed as of 2026-08-10.
 - Frontend: target not yet decided (Vercel is the path of least resistance
   for Next.js; self-hosting alongside the backend is the alternative if
   everything should live on the one VM).

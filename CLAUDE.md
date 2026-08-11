@@ -52,10 +52,6 @@ concerns on top.
 
 ## Open questions (carried over from the subproject files)
 
-- Backend DB choice: Postgres is the *assumed* default in
-  `backend/CLAUDE.md`, but your global stack notes say MySQL HeatWave on
-  Oracle Cloud — these disagree and should be reconciled before the DB
-  layer is built.
 - Auth model — not designed on either side yet.
 - Deployment target for MacroShield itself: nothing is deployed to the
   Oracle VM yet (verified — the VM currently only runs an unrelated app,

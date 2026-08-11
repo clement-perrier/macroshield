@@ -24,10 +24,15 @@ This repo is the **backend**: data ingestion, the rules engine, the ML layer, an
 
 ## Tech stack
 
-- **Confirmed**: Python 3.11+, FastAPI.
+- **Confirmed**: Python 3.11+, FastAPI. Database: PostgreSQL, self-hosted on
+  the Oracle Cloud Always Free VM (`oracle-vm`) — decided 2026-08-10.
+  Oracle has no free managed Postgres offering (their paid "OCI Database
+  with PostgreSQL" is billed per OCPU/storage; the free Autonomous Database
+  is a different, non-Postgres engine), so this runs unmanaged: we own
+  patching, backups, and tuning ourselves. Consider the TimescaleDB
+  extension given the indicator data is inherently time-series.
 - WHen adding new features, suggests frameworks or any that would be more optimized or good practice. E.g asyncio
 - **Assumed defaults** (flag if you want something else — not yet locked in):
-  - PostgreSQL (time-series indicator history + user strategy configs). Consider the TimescaleDB extension given the indicator data is inherently time-series.
   - `pandas` + `pandas-ta` (or `TA-Lib` if available in the environment) for MACD/RSI.
   - `scikit-learn` for the backtester / auto-tune logic; `PyTorch` if/when the LSTM/Transformer pattern-recognition model is built.
   - APScheduler (simple) or Celery + Redis (if we need distributed/retryable jobs) for the periodic FRED pulls and the 6-hourly news scan.
@@ -178,7 +183,6 @@ backend/
 
 ## Open questions / not yet decided
 
-- Final DB choice (Postgres assumed — confirm).
 - Job scheduler (APScheduler vs Celery+Redis) — depends on expected data volume/concurrency.
 - ML framework (scikit-learn only vs adding PyTorch) — depends on how soon the LSTM/Transformer work starts.
 - Hosting/deployment target.
