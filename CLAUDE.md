@@ -37,9 +37,11 @@ concerns on top.
   global `~/.claude/CLAUDE.md` for the rest of your standing preferences
   (macOS-only shell commands, run tests before suggesting a commit, never
   hardcode secrets).
-- Never push with a Claude Code trailer to this repo (per both subproject
-  files) — confirm this still applies at the monorepo level or update if
-  it's changed.
+- No Claude Code attribution trailer on commits/PRs in this repo (per both
+  subproject files) — enforced via `attribution: {"commit": "", "pr": ""}`
+  in `.claude/settings.json`, not just a convention to remember.
+- Run `/ship` to test, commit, and push in one go (see
+  `.claude/skills/ship/SKILL.md`) instead of doing each step manually.
 - The two subprojects were previously separate repos
   (`macroshield-backend`, `macroshield-frontend`, both public on GitHub)
   merged here with full commit history via `git subtree`. Those originals
