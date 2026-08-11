@@ -42,6 +42,10 @@ concerns on top.
   in `.claude/settings.json`, not just a convention to remember.
 - Run `/ship` to test, commit, and push in one go (see
   `.claude/skills/ship/SKILL.md`) instead of doing each step manually.
+- As this project grows, keep an eye out for repeated manual workflows that
+  a new hook, skill, or agent could speed up (the way `/ship` and the
+  no-attribution setting came out of this same pattern) — when you spot
+  one, suggest it to me rather than just doing the manual version again.
 - The two subprojects were previously separate repos
   (`macroshield-backend`, `macroshield-frontend`, both public on GitHub)
   merged here with full commit history via `git subtree`. Those originals
