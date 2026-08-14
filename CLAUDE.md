@@ -59,7 +59,7 @@ concerns on top.
 ## Open questions (carried over from the subproject files)
 
 - Auth model — not designed on either side yet.
-- Deployment target for MacroShield itself: nothing is deployed to the
-  Oracle VM yet (verified — the VM currently only runs an unrelated app,
-  `conjugationapp.service`). Hosting/deploy setup for MacroShield is still
-  to be decided.
+- Deployment target: frontend will deploy to **Vercel** (decided
+  2026-08-12); backend still targets the Oracle VM, nothing deployed there
+  yet (verified — the VM currently only runs an unrelated app,
+  `conjugationapp.service`). See `docs/ARCHITECTURE.md` § "Deployment".

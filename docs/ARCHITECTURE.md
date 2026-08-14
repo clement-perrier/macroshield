@@ -26,14 +26,12 @@
   access (FRED API only — never scraped, per FRED's terms of use), the
   macro/sector/fundamental/technical rules engine, and (later) the ML
   breakout model. Exposes the public API contract the frontend consumes.
-- **Database** — PostgreSQL, self-hosted on the Oracle Cloud Always Free VM
-  (`oracle-vm`) — decided 2026-08-10. Oracle has no free *managed* Postgres
-  offering: their paid "OCI Database with PostgreSQL" service is billed per
-  OCPU/storage, and the free Autonomous Database is a different, non-Postgres
-  engine. Running it ourselves on the free compute/storage allocation is the
-  only $0 way to get real Postgres, at the cost of owning patching, backups,
-  and tuning ourselves. TimescaleDB extension still to evaluate for the
-  time-series indicator history.
+- **Database** — PostgreSQL 17, self-hosted on a dedicated Oracle Cloud
+  Always Free VM (`macroshield-vm`, separate from `oracle-vm` which runs
+  the unrelated `conjugationapp`) — decided 2026-08-10, provisioned
+  2026-08-13. See `docs/adr/0001-self-hosted-postgres-on-dedicated-vm.md`
+  for the full reasoning, alternatives considered, and tuning applied.
+  TimescaleDB extension evaluated and deferred — nothing depends on it yet.
 
 ## API contract
 
@@ -46,22 +44,19 @@ generated contract so the boundary stays enforced.
 
 ## Deployment
 
-Nothing is deployed yet. Confirmed by SSH to the Oracle Cloud VM
-(2026-08-10): the VM currently runs one unrelated Spring Boot app
-(`conjugationapp.service`, a different project) — no MacroShield backend or
-frontend process, systemd unit, or files exist there. When deployment is
-set up:
+The backend app itself is not deployed yet. Database is: PostgreSQL 17
+runs on `macroshield-vm`, provisioned 2026-08-13 (see ADR 0001), listening
+on `127.0.0.1` only — not reachable from the network, only via SSH tunnel
+from a dev machine for now. `oracle-vm` remains conjugationapp-only; no
+MacroShield process, systemd unit, or files exist there.
 
-- Backend: presumably a systemd service on the Oracle VM (matching the
-  existing pattern used for the other app), reachable from the frontend
-  over the VM's subnet or a public endpoint.
-- Database: PostgreSQL installed directly on the same free VM (or a second
-  Always Free VM for isolation from the unrelated `conjugationapp`
-  workload — Always Free includes 2 AMD VMs plus up to 4 Arm OCPUs to split
-  across instances). Not yet installed as of 2026-08-10.
-- Frontend: target not yet decided (Vercel is the path of least resistance
-  for Next.js; self-hosting alongside the backend is the alternative if
-  everything should live on the one VM).
+- Backend: not yet deployed. Once it is, presumably a systemd service on
+  `macroshield-vm` (matching the existing pattern used for
+  `conjugationapp` on its own VM), reachable from the frontend over a
+  public endpoint.
+- Frontend: **Vercel** (decided 2026-08-12) — path of least resistance for
+  Next.js; the backend/DB stay on the Oracle VM, so the frontend will call
+  it over its public endpoint rather than the VM's private subnet.
 - Both repos currently have no CI/CD (no `.github/workflows`) — see
   root `CLAUDE.md` § "Global conventions" for the GitHub Actions plan.
 

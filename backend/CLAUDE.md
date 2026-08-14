@@ -24,13 +24,35 @@ This repo is the **backend**: data ingestion, the rules engine, the ML layer, an
 
 ## Tech stack
 
-- **Confirmed**: Python 3.11+, FastAPI. Database: PostgreSQL, self-hosted on
-  the Oracle Cloud Always Free VM (`oracle-vm`) — decided 2026-08-10.
-  Oracle has no free managed Postgres offering (their paid "OCI Database
-  with PostgreSQL" is billed per OCPU/storage; the free Autonomous Database
-  is a different, non-Postgres engine), so this runs unmanaged: we own
-  patching, backups, and tuning ourselves. Consider the TimescaleDB
-  extension given the indicator data is inherently time-series.
+- **Confirmed**: Python 3.11+, FastAPI. Database: PostgreSQL, self-hosted —
+  decided 2026-08-10, provisioned 2026-08-13. Oracle has no free managed
+  Postgres offering (their paid "OCI Database with PostgreSQL" is billed per
+  OCPU/storage; the free Autonomous Database is a different, non-Postgres
+  engine), so this runs unmanaged: we own patching, backups, and tuning
+  ourselves. TimescaleDB was considered and explicitly deferred (2026-08-13)
+  — nothing in the schema depends on it yet; revisit once there's an actual
+  performance reason to.
+  - **Runs on a second, dedicated Always Free VM** (`macroshield-vm`,
+    `192.9.224.120`, SSH alias in `~/.ssh/config`) — **not** `oracle-vm`,
+    which is a different VM that only runs the unrelated `conjugationapp`.
+    Both are free `VM.Standard.E2.1.Micro` (1 OCPU, ~956MB RAM) instances;
+    `macroshield-vm` was created 2026-08-13 specifically to keep MacroShield
+    off a box that was already at ~50% RAM from `conjugationapp`.
+  - Postgres 17 via the official PGDG apt repo (Ubuntu 22.04 ships 14).
+    Tuned down for the 956MB box: `max_connections=20`,
+    `effective_cache_size=384MB`, `maintenance_work_mem=48MB` (`ALTER
+    SYSTEM`, so it survives `apt` upgrades). 2GB swapfile added as an OOM
+    safety net.
+  - Listens on `127.0.0.1` only — not reachable from the network at all,
+    by design. From a dev machine, tunnel first: `ssh -N -L
+    5433:127.0.0.1:5432 macroshield-vm`, then point `DATABASE_URL` at
+    `127.0.0.1:5433` (see `backend/.env`, gitignored — real credentials
+    live only there, never in this file or in git).
+  - `app.services.fred_cache.refresh_series` batches upserts at ~8191
+    rows/statement — Postgres's 32,767-bind-parameter limit is real and
+    was hit in practice by daily series' full history (`T10Y2Y`, ~13k
+    rows) the first time this ran against actual Postgres; the sqlite test
+    fixture never had enough rows to catch it. Don't remove the batching.
 - WHen adding new features, suggests frameworks or any that would be more optimized or good practice. E.g asyncio
 - **Assumed defaults** (flag if you want something else — not yet locked in):
   - `pandas` + `pandas-ta` (or `TA-Lib` if available in the environment) for MACD/RSI.
