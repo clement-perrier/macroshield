@@ -1,13 +1,29 @@
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.db.session import get_engine
 from app.routers import health, macro
+from app.services.scheduler import build_scheduler
 
 logging.basicConfig(level=logging.INFO)
 
-app = FastAPI(title="MacroShield Backend")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    scheduler = build_scheduler()
+    scheduler.start()
+    try:
+        yield
+    finally:
+        scheduler.shutdown()
+        await get_engine().dispose()
+
+
+app = FastAPI(title="MacroShield Backend", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

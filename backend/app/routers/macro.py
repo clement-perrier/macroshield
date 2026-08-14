@@ -1,10 +1,13 @@
 import logging
 from datetime import date, timedelta
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.zones import ZONE_CONFIGS
-from app.services.fred_client import FredObservation, fetch_series
+from app.db.session import get_session
+from app.services.fred_cache import get_cached_series
+from app.services.fred_client import FredObservation
 from app.services.macro_engine import (
     MOMENTUM_WINDOW_MONTHS,
     TRAILING_HISTORY_MONTHS,
@@ -43,16 +46,18 @@ def _monthly_samples(observations: list[FredObservation], months: int) -> list[F
 
 
 @router.get("/{zone}/macro")
-async def get_zone_macro(zone: str) -> dict:
+async def get_zone_macro(zone: str, session: AsyncSession = Depends(get_session)) -> dict:
     zone_config = ZONE_CONFIGS.get(zone)
     if zone_config is None:
         raise HTTPException(status_code=404, detail=f"Zone '{zone}' is not supported yet")
 
     observation_start = date.today() - timedelta(days=FETCH_LOOKBACK_DAYS)
 
-    pmi_obs = await fetch_series(zone_config.pmi_series_id, observation_start)
-    inflation_obs = await fetch_series(zone_config.inflation_series_id, observation_start)
-    rate_obs = await fetch_series(zone_config.rate_series_id, observation_start)
+    pmi_obs = await get_cached_series(session, zone_config.pmi_series_id, observation_start)
+    inflation_obs = await get_cached_series(
+        session, zone_config.inflation_series_id, observation_start
+    )
+    rate_obs = await get_cached_series(session, zone_config.rate_series_id, observation_start)
 
     monthly_rates = _monthly_samples(rate_obs, RATE_LOG_LOOKBACK_MONTHS)
     logger.info(
@@ -96,11 +101,13 @@ async def get_zone_macro(zone: str) -> dict:
 
     yield_curve_state = None
     if zone_config.yield_curve_long_series_id is not None:
-        long_obs = await fetch_series(zone_config.yield_curve_long_series_id, observation_start)
+        long_obs = await get_cached_series(
+            session, zone_config.yield_curve_long_series_id, observation_start
+        )
         short_obs = None
         if zone_config.yield_curve_short_series_id is not None:
-            short_obs = await fetch_series(
-                zone_config.yield_curve_short_series_id, observation_start
+            short_obs = await get_cached_series(
+                session, zone_config.yield_curve_short_series_id, observation_start
             )
 
         curve_obs = compute_yield_curve_observations(long_obs, short_obs)

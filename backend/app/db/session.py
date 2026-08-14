@@ -1,0 +1,30 @@
+from collections.abc import AsyncGenerator
+from functools import lru_cache
+
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
+
+from app.core.config import get_settings
+
+
+@lru_cache
+def get_engine() -> AsyncEngine:
+    # pool_pre_ping: cheap SELECT 1 before handing out a pooled connection, so a
+    # connection the oracle-vm side has quietly dropped (idle timeout, restart)
+    # gets replaced instead of surfacing as a query-time error.
+    return create_async_engine(get_settings().database_url, pool_pre_ping=True)
+
+
+@lru_cache
+def get_sessionmaker() -> async_sessionmaker[AsyncSession]:
+    return async_sessionmaker(get_engine(), expire_on_commit=False)
+
+
+async def get_session() -> AsyncGenerator[AsyncSession]:
+    """FastAPI dependency: `session: AsyncSession = Depends(get_session)`."""
+    async with get_sessionmaker()() as session:
+        yield session

@@ -195,9 +195,7 @@ def test_classify_rate_trend_move_at_tolerance_boundary_is_stable() -> None:
 
 def test_classify_rate_trend_move_above_tolerance_is_rising() -> None:
     # Real EU ECBMRRFR example: 2.15 -> 2.4, a genuine +25bp hike.
-    observations = _make_observations(
-        [2.15, 2.15, 2.15, 2.4], start=date(2026, 1, 1), step_days=30
-    )
+    observations = _make_observations([2.15, 2.15, 2.15, 2.4], start=date(2026, 1, 1), step_days=30)
     assert classify_rate_trend(observations) == "rising"
 
 
