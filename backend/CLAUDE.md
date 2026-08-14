@@ -3,6 +3,8 @@
 This file is project memory for Claude Code. Read it before writing code in this repo.
 Never push any thing to the github repo with Claude trailer. 
 Keep in mind Pythin is not my speciality, don't hesitate to explain lines of code.
+After any non-trivial backend change, walk through it in plain language —
+see `.claude/skills/explain-changes/SKILL.md` (auto-triggers, no slash command needed).
 
 ## What this app does
 
