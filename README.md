@@ -16,6 +16,14 @@ Each has its own `CLAUDE.md` with project-specific context; see
 
 ## Getting started
 
+Quick start scripts (macOS): `./scripts/dev-backend.sh` runs the backend
+only; `./scripts/dev-full.sh` opens the SSH tunnel to `macroshield-vm`'s
+Postgres, starts the backend and frontend, and opens the browser once both
+are up (Ctrl+C tears everything down). If something gets left running
+(crash, force-closed terminal), `./scripts/dev-stop.sh` kills whatever's
+still listening on the dev ports. Manual steps below if you'd rather run
+things individually.
+
 ### Backend
 
 ```bash
