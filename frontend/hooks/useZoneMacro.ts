@@ -11,8 +11,16 @@ interface ZoneMacroState {
   loading: boolean;
 }
 
+// Result is tagged with the zone it was fetched for, so a render can tell
+// whether `state` is still catching up to a just-changed `zone` prop and
+// report `loading` instead of flashing the previous zone's data.
+interface FetchedFor extends ZoneMacroState {
+  zone: string;
+}
+
 export function useZoneMacro(zone: string): ZoneMacroState {
-  const [state, setState] = useState<ZoneMacroState>({
+  const [state, setState] = useState<FetchedFor>({
+    zone,
     data: null,
     error: null,
     loading: true,
@@ -23,11 +31,12 @@ export function useZoneMacro(zone: string): ZoneMacroState {
 
     getZoneMacro(zone)
       .then((data) => {
-        if (!cancelled) setState({ data, error: null, loading: false });
+        if (!cancelled) setState({ zone, data, error: null, loading: false });
       })
       .catch((err: unknown) => {
         if (!cancelled) {
           setState({
+            zone,
             data: null,
             error: err instanceof Error ? err.message : "Unknown error",
             loading: false,
@@ -39,6 +48,10 @@ export function useZoneMacro(zone: string): ZoneMacroState {
       cancelled = true;
     };
   }, [zone]);
+
+  if (state.zone !== zone) {
+    return { data: null, error: null, loading: true };
+  }
 
   return state;
 }

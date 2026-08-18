@@ -6,11 +6,15 @@ interface MetricGridProps {
   metrics: MacroMetric[];
 }
 
+// Match by `label`, not `series_id`: the backend picks a different source
+// FRED series per zone (e.g. EU's PMI proxy is BSCICP02DEM460S, not US's
+// IPMAN — see backend/app/core/zones.py), but always assigns the same fixed
+// label per metric role regardless of zone (see backend/app/routers/macro.py).
 function findMetric(
   metrics: MacroMetric[],
-  seriesId: string,
+  label: string,
 ): MacroMetric | undefined {
-  return metrics.find((metric) => metric.series_id === seriesId);
+  return metrics.find((metric) => metric.label === label);
 }
 
 // Backend trends arrive as enum-ish strings (e.g. "falling_fast"); turn them
@@ -23,17 +27,17 @@ function humanizeTrend(trend: string): string {
 }
 
 export function MetricGrid({ metrics }: MetricGridProps) {
-  const pmi = findMetric(metrics, "IPMAN");
-  const inflation = findMetric(metrics, "CPIAUCSL");
-  const rate = findMetric(metrics, "FEDFUNDS");
-  const yieldCurve = findMetric(metrics, "T10Y2Y");
+  const pmi = findMetric(metrics, "PMI proxy growth momentum");
+  const inflation = findMetric(metrics, "Inflation momentum");
+  const rate = findMetric(metrics, "Central bank rate");
+  const yieldCurve = findMetric(metrics, "Yield curve");
 
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       {pmi && (
         <MetricCard
           label="PMI Proxy"
-          helpText="Industrial production momentum, standing in for the manufacturing PMI."
+          helpText="A momentum read on industrial activity, standing in for the manufacturing PMI."
           value={pmi.value.toFixed(1)}
           tag={
             pmi.growth_score !== undefined && (
@@ -74,7 +78,7 @@ export function MetricGrid({ metrics }: MetricGridProps) {
       {rate && (
         <MetricCard
           label="Central Bank Rate"
-          helpText="Federal Funds effective rate."
+          helpText="This zone's key policy interest rate."
           value={`${rate.value.toFixed(2)}%`}
           footer={
             rate.trend && (
@@ -88,8 +92,8 @@ export function MetricGrid({ metrics }: MetricGridProps) {
 
       {yieldCurve && (
         <MetricCard
-          label="Yield Curve (10Y-2Y)"
-          helpText="Spread between 10-year and 2-year Treasury yields. Negative means the curve is inverted, a classic recession warning."
+          label="Yield Curve"
+          helpText="Spread between long- and short-term government bond yields. Negative means the curve is inverted, a classic recession warning."
           value={`${yieldCurve.value >= 0 ? "+" : ""}${yieldCurve.value.toFixed(2)}%`}
           alert={yieldCurve.value < 0}
           tag={
