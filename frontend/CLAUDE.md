@@ -100,7 +100,7 @@ frontend/
 
 - TypeScript strict mode; no `any` without a comment explaining why.
 - ESLint + Prettier (or Biome — confirm on setup); keep them non-negotiable in CI.
-- Component tests via React Testing Library; consider Playwright for the Studio flow (multi-step accordion + save) since it's the most stateful screen.
+- Component tests via React Testing Library, runner is Vitest (Next.js's current recommended pairing over Jest — lighter setup, no Babel/SWC transform config needed; decided 2026-08-17, not yet installed). Vitest doesn't support `async` Server Components, so those still need Playwright; consider Playwright for the Studio flow (multi-step accordion + save) too, since it's the most stateful screen.
 - Server state (API data) lives in TanStack Query; don't duplicate it into local component state.
 
 ## Build order / current priority
