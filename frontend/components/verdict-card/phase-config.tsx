@@ -21,8 +21,8 @@ export const PHASE_CONFIG: Record<MacroPhase, PhaseConfig> = {
     bg: "bg-emerald-500/10",
     border: "border-emerald-500/40",
   },
-  // Not specified in the original brief — provisional pending confirmation
-  // from the business-logic owner. See frontend-CLAUDE.md open questions.
+  // Not in the original brief; confirmed 2026-08-18. See frontend/CLAUDE.md
+  // "Design system".
   expansion: {
     headline: "Peak Cycle: Broad-Based Growth",
     subtext: "Recommended strategy: Broad equities.",

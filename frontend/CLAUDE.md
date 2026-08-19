@@ -44,7 +44,7 @@ The product brief already pins down a specific visual direction — **follow it 
 - **Zone tab bar**: horizontal, rounded, 3 buttons — US / EU / CN. Active tab: electric blue with a subtle background blur. Inactive tabs: greyed out.
 - **Verdict card** (~30% of viewport height, the dashboard's focal point) — color, icon, and copy change with the zone's classified phase:
   - **Phase 1 (Recovery)**: soft emerald green, rocket icon, headline "Early Cycle: Active Industrial Expansion," subtext "Recommended strategy: Cyclicals & Tech."
-  - **Phase 2 (Expansion)**: _not specified in the original brief_ — needs a color/icon decision before this state can ship. My instinct: a warmer/bolder variant in the same green-to-red spectrum (e.g. a golden-amber-yet-positive tone) so the 4 phases read as a clear progression, but confirm with the business-logic owner before locking it in.
+  - **Phase 2 (Expansion)**: golden-amber (still positive, warmer than Recovery's green), flame icon, headline "Peak Cycle: Broad-Based Growth," subtext "Recommended strategy: Broad equities." (not in the original brief; confirmed 2026-08-18 — see `components/verdict-card/phase-config.tsx`).
   - **Phase 3 (Slowdown)**: amber/orange, shield icon, headline "Stagflation / Braking," subtext "Recommended strategy: Defensive sectors only."
   - **Phase 4 (Recession)**: brick red, exclamation icon, headline "Bear Market / Crisis," subtext "Recommended strategy: Cash, Bonds, or Short."
 - **Metric grid** (2×2, just below the verdict card):
@@ -111,7 +111,6 @@ frontend/
 
 ## Open questions / not yet decided
 
-- Exact color/icon for the Phase 2 (Expansion) verdict card — not specified in the original brief.
 - Charting library choice for any technical (MACD/RSI) visualizations.
 - Auth model — Studio strategies are saved per-user, which implies accounts; not yet designed on either side.
 - Real-time mechanism for the Alerts tab (polling vs SSE/WebSocket vs web push).
