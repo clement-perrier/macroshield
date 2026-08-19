@@ -12,7 +12,7 @@ export default function Home() {
   const { data, error, loading } = useZoneMacro(zone);
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-6 bg-black px-4 py-8 text-white">
+    <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 bg-black px-4 py-8 text-white">
       <h1 className="text-xl font-semibold">Global Macro Shield</h1>
 
       <ZoneTabBar activeZone={zone} onZoneChange={setZone} />
