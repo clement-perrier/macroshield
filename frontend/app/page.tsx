@@ -1,5 +1,6 @@
 "use client";
 
+import { Loader2 } from "lucide-react";
 import { useState } from "react";
 
 import { MetricGrid } from "@/components/metric-grid/MetricGrid";
@@ -12,13 +13,16 @@ export default function Home() {
   const { data, error, loading } = useZoneMacro(zone);
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 bg-black px-4 py-8 text-white">
+    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 bg-black px-4 py-8 text-white">
       <h1 className="text-xl font-semibold">Global Macro Shield</h1>
 
       <ZoneTabBar activeZone={zone} onZoneChange={setZone} />
 
       {loading && (
-        <p className="text-sm text-white/50">Loading the latest macro read…</p>
+        <div className="flex flex-1 flex-col items-center justify-center gap-3">
+          <Loader2 className="size-6 animate-spin text-white/50" />
+          <p className="text-sm text-white/50">Loading the latest macro read…</p>
+        </div>
       )}
 
       {error && (
