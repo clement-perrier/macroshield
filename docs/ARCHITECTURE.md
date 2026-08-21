@@ -44,19 +44,41 @@ generated contract so the boundary stays enforced.
 
 ## Deployment
 
-The backend app itself is not deployed yet. Database is: PostgreSQL 17
-runs on `macroshield-vm`, provisioned 2026-08-13 (see ADR 0001), listening
-on `127.0.0.1` only — not reachable from the network, only via SSH tunnel
-from a dev machine for now. `oracle-vm` remains conjugationapp-only; no
-MacroShield process, systemd unit, or files exist there.
+Backend and database both run on `macroshield-vm` (deployed 2026-08-20),
+deliberately co-located so the app can reach Postgres over `127.0.0.1`
+without ever exposing the database to the network — see ADR 0001.
+`oracle-vm` remains conjugationapp-only; no MacroShield process, systemd
+unit, or files exist there.
 
-- Backend: not yet deployed. Once it is, presumably a systemd service on
-  `macroshield-vm` (matching the existing pattern used for
-  `conjugationapp` on its own VM), reachable from the frontend over a
-  public endpoint.
+- **Backend**: FastAPI under `uvicorn`, run as the `macroshield-backend`
+  systemd service (`User=ubuntu`, auto-restart, starts on boot), bound to
+  `127.0.0.1:8000` — not exposed directly. Deployed to `/opt/macroshield`
+  (shallow clone of this repo), dependencies via `uv`/`uv.lock`, Python
+  3.11 installed via `uv python install` (the VM's system Python is
+  3.10). Secrets live in `/opt/macroshield/backend/.env` (mode 600, never
+  committed), same shape as the local dev `.env`.
+- **Reverse proxy / TLS**: nginx proxies `api-macroshield.crcbp.com` (A
+  record in Route 53 → `192.9.224.120`) to `127.0.0.1:8000`, with a
+  Let's Encrypt cert via `certbot --nginx` (auto-renews via
+  `certbot.timer`, expires 2026-11-18, HTTP→HTTPS redirect on). TLS is
+  required, not cosmetic: the frontend serves over HTTPS from Vercel, and
+  browsers block `fetch` calls from an HTTPS page to a plain-HTTP origin
+  (mixed content), so the backend has to terminate TLS for the frontend
+  to be able to call it at all.
+- **Firewall**: OS-level `iptables` on the VM only allowed port 22
+  inbound by default (Oracle's stock image config) — ports 80/443 were
+  added explicitly and persisted via `netfilter-persistent`; the matching
+  OCI Security List ingress rules were opened in the console. Postgres
+  itself is untouched by this — still `127.0.0.1`-only per ADR 0001, only
+  reachable from processes on the box itself (the backend) or a dev
+  machine's SSH tunnel.
+- **CORS**: `app/main.py` currently only allows `http://localhost:3000`.
+  Needs updating once the frontend has a real Vercel URL — not done yet
+  since the frontend isn't deployed.
 - Frontend: **Vercel** (decided 2026-08-12) — path of least resistance for
   Next.js; the backend/DB stay on the Oracle VM, so the frontend will call
-  it over its public endpoint rather than the VM's private subnet.
+  it over its public endpoint (`https://api-macroshield.crcbp.com`) rather
+  than the VM's private subnet.
 - Both repos currently have no CI/CD (no `.github/workflows`) — see
   root `CLAUDE.md` § "Global conventions" for the GitHub Actions plan.
 
