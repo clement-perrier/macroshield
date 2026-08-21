@@ -28,6 +28,10 @@ app = FastAPI(title="MacroShield Backend", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"],
+    # Matches every Vercel deployment (production + previews) for this
+    # project — the hash in the URL changes on each deploy, so a fixed
+    # origin list would break on the next push.
+    allow_origin_regex=r"https://macroshield-[a-z0-9]+-clement-perriers-projects\.vercel\.app",
     allow_methods=["*"],
     allow_headers=["*"],
 )
